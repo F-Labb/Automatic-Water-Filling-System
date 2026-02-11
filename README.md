@@ -25,6 +25,10 @@ Safety (Timeouts): Automatic forced valve closure after 5-7 minutes if the level
 
 • Sensors: Reed level sensors (connected with INPUT_PULLUP).
 
+Actuators: Solenoid valves (normally closed).
+• Type: Solenoid valves with 1/4" quick-release tube (connected to the Barrier filtration system).
+• Power: 12V DC
+
 **Operating Logic**
 
 1. Event: The sensor signals a low water level.
