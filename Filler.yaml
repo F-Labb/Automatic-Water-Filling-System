@@ -1,0 +1,233 @@
+esphome:
+  name: filler
+  friendly_name: СКУВ
+  on_boot:
+    - priority: 600
+      then:
+        - switch.turn_off: coffee_machine_gpio
+        - switch.turn_off: water_heater_gpio
+        - switch.turn_off: vacuum_gpio
+        - lock.lock: autofill_lock
+
+esp32:
+  board: esp32-c6-devkitc-1
+  framework:
+    type: esp-idf
+
+# Home Assistant API
+api:
+  encryption:
+    key: "xxx"
+
+ota:
+  - platform: esphome
+    password: "xxx"
+
+network:
+  enable_ipv6: true
+
+openthread:
+  device_type: FTD
+  tlv: !secret thread_tlv
+
+substitutions:
+  # Клапана
+  coffeemachine_mos: GPIO1
+  water_heater_mos: GPIO2
+  vacuum_mos: GPIO3
+
+  # Бинарнве датчики
+  vacuum_binary: GPIO14
+  water_heater_binary: GPIO18
+  coffeemachine_binary: GPIO19
+
+  # Датчики
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: $coffeemachine_binary
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Кофемашинка"
+    id: coffee_machine
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 150ms
+    on_press:
+      - delay: 3min
+      - if:
+          condition:
+            and:
+              - lambda: 'return id(autofill_lock).state == LOCK_STATE_UNLOCKED;'  # Блокировка выключена?
+              - lambda: 'return id(coffee_machine).state;' # Датчик точно включен?
+          then:
+            - switch.turn_on: coffee_machine_gpio
+    on_release:
+      then:
+        - switch.turn_off: coffee_machine_gpio
+
+  - platform: gpio
+    pin:
+      number: $water_heater_binary
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Водонагреватель"
+    id: water_heater
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 150ms
+    on_press:
+      - delay: 3min
+      - if:
+          condition:
+            and:
+              - lambda: 'return id(autofill_lock).state == LOCK_STATE_UNLOCKED;'  # Блокировка выключена?
+              - lambda: 'return id(water_heater).state;' # Датчик точно включен?
+          then:
+            - switch.turn_on: water_heater_gpio
+    on_release:
+      then:
+        - switch.turn_off: water_heater_gpio
+
+  - platform: gpio
+    pin:
+      number: $vacuum_binary
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Пылесос"
+    id: vacuum
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 150ms
+    on_press:
+      - delay: 3h
+      - if:
+          condition:
+            and:
+              - lambda: 'return id(autofill_lock).state == LOCK_STATE_UNLOCKED;'  # Блокировка выключена?
+              - lambda: 'return id(vacuum).state;' # Датчик точно включен?
+          then:
+          - switch.turn_on: vacuum_gpio
+    on_release:
+      then:
+        - switch.turn_off: vacuum_gpio
+
+  # Блокировка
+lock:
+  - platform: template
+    name: "Блокировка"
+    optimistic: true
+    id: autofill_lock
+    on_lock:
+      then:
+        - switch.turn_off: vacuum_gpio
+        - switch.turn_off: water_heater_gpio
+        - switch.turn_off: coffee_machine_gpio
+
+  # При отключении блокировки, доливаем воду
+    on_unlock:
+      - if:
+          condition:
+            lambda: 'return id(coffee_machine).state;'
+          then:
+          - switch.turn_on: coffee_machine_gpio
+      - if:
+          condition:
+            lambda: 'return id(water_heater).state;'
+          then:
+          - switch.turn_on: water_heater_gpio
+      - if:
+          condition:
+            lambda: 'return id(vacuum).state;'
+          then:
+          - switch.turn_on: vacuum_gpio
+
+switch:
+  - platform: gpio
+    id: coffee_machine_gpio
+    pin: $coffeemachine_mos
+    restore_mode: ALWAYS_OFF
+    internal: True
+    on_turn_on:
+      then:
+        - delay: 5min
+        - switch.turn_off: coffee_machine_gpio
+
+  - platform: gpio
+    id: water_heater_gpio
+    pin: $water_heater_mos
+    restore_mode: ALWAYS_OFF
+    internal: True
+    on_turn_on:
+      then:
+        - delay: 5min
+        - switch.turn_off: water_heater_gpio
+
+  - platform: gpio
+    id: vacuum_gpio
+    pin: $vacuum_mos
+    restore_mode: ALWAYS_OFF
+    internal: True
+    on_turn_on:
+      then:
+        - delay: 7min
+        - switch.turn_off: vacuum_gpio
+
+  # Клапана
+valve:
+  - platform: template
+    name: "Кофемашинка"
+    id: coffee_machine_valve
+    device_class: water
+    lambda: |-
+      if (id(coffee_machine_gpio).state) {
+        return VALVE_OPEN;
+      } else {
+        return VALVE_CLOSED;
+      }
+    open_action:
+      - if:
+          condition:
+            lambda: 'return id(coffee_machine).state;'
+          then:
+            - switch.turn_on: coffee_machine_gpio
+    close_action:
+      - switch.turn_off: coffee_machine_gpio
+
+  - platform: template
+    name: "Водонагреватель"
+    id: water_heater_valve
+    device_class: water
+    lambda: |-
+      if (id(water_heater_gpio).state) {
+        return VALVE_OPEN;
+      } else {
+        return VALVE_CLOSED;
+      }
+    open_action:
+      - if:
+          condition:
+            lambda: 'return id(water_heater).state;'
+          then:
+            - switch.turn_on: water_heater_gpio
+    close_action:
+      - switch.turn_off: water_heater_gpio
+
+  - platform: template
+    name: "Пылесос"
+    id: vacuum_valve
+    device_class: water
+    lambda: |-
+      if (id(vacuum_gpio).state) {
+        return VALVE_OPEN;
+      } else {
+        return VALVE_CLOSED;
+      }
+    open_action:
+      - if:
+          condition:
+            lambda: 'return id(vacuum).state;'
+          then:
+            - switch.turn_on: vacuum_gpio
+    close_action:
+      - switch.turn_off: vacuum_gpio
