@@ -5,13 +5,13 @@ Automated water filling for coffee machine, thermopot, and robotic vacuum cleane
 
 • Three independent channels: separate refill control for the coffee machine, water heater, and vacuum cleaner.
 
-  • Smart delays:
+• Smart delays:
 
-• Coffee machine and water heater: 3-minute wait before switching on (prevents false alarms/chatter).
+Coffee machine and water heater: 3-minute wait before switching on (prevents false alarms/chatter).
 
-• Vacuum cleaner: 3-hour wait (ideal for periodic maintenance).
+Vacuum cleaner: 3-hour wait (ideal for periodic maintenance).
 
-• Safety (Timeouts): Automatic forced valve closure after 5-7 minutes if the level sensor is not triggered.
+Safety (Timeouts): Automatic forced valve closure after 5-7 minutes if the level sensor is not triggered.
 
 • Master lock: Global autofill_lock switch that instantly closes all valves and prevents them from opening (e.g., when leaving).
 
